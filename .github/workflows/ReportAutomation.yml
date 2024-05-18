@@ -1,0 +1,89 @@
+import pyodbc
+import pandas as pd
+import os
+import win32com.client as win32
+
+# Function to execute SQL query and return DataFrame
+def execute_sql_query():
+    # Establish connection to SQL Server
+    cnxn_str = ("Driver={ODBC Driver 17 for SQL Server};"
+                "Server=LAPTOP-2G00AOG8\SQLEXPRESS;"
+                "Database=master;"
+                "Trusted_Connection=yes;")
+    cnxn = pyodbc.connect(cnxn_str)
+    
+    # Execute SQL query
+    cursor = cnxn.cursor()
+    cursor.execute("SELECT * FROM dbo.Employee")
+    
+    # Fetch results
+    results = cursor.fetchall()
+    
+    # Close cursor
+    cursor.close()
+    # Extract ID and Name from results
+    id_name_tuples = [(row[0], row[1]) for row in results]
+    
+    # Create DataFrame from extracted data
+    df_sql = pd.DataFrame(id_name_tuples, columns=['ID', 'Name'])
+    
+    return df_sql
+
+# Function to merge DataFrame with Excel data
+def merge_with_excel(df_sql):
+    # Read Excel file
+    df_excel = pd.read_excel(r"C:\Users\Temur\Desktop\New folder\department.xlsx")
+    
+    # Perform VLOOKUP using merge function
+    merged_df = pd.merge(df_sql, df_excel, on='Name', how='left')
+    
+    # Replace missing values in Dept_ID column with empty strings
+    merged_df['Dept_ID'] = merged_df['Dept_ID'].fillna('')
+    
+    # Convert Dept_ID to integer (removing decimal points)
+    merged_df['Dept_ID'] = merged_df['Dept_ID'].apply(lambda x: int(x) if x != '' else '')
+    
+    return merged_df
+
+# Function to save merged DataFrame to Excel
+def save_to_excel(merged_df):
+    # Get the path to the desktop
+    desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    
+    # Define the file path
+    file_path = os.path.join(desktop_path, 'merged_data.xlsx')
+    
+    # Save the DataFrame to an Excel file
+    merged_df.to_excel(file_path, index=False)
+    
+    print(f"Excel file saved to desktop as 'merged_data.xlsx'")
+    
+ # Function to send email using Outlook
+def send_email(report_file_path):
+    outlook = win32.Dispatch('outlook.application')
+    mail = outlook.CreateItem(0)
+    mail.To = 'temurd0103@gmail.com'  # Replace with recipient's email address
+    mail.Subject = 'Hello, here\'s my report'
+    mail.Body = 'Please find the attached report.'
+    mail.Attachments.Add(report_file_path)
+    mail.Send()
+    print("Email sent successfully")
+    
+# Main function
+def main():
+    # Execute SQL query
+    df_sql = execute_sql_query()
+    
+    # Merge DataFrame with Excel data
+    merged_df = merge_with_excel(df_sql)
+    
+    # Save merged DataFrame to Excel
+    save_to_excel(merged_df)
+    
+    # Send email with report attached
+    report_file_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop', 'merged_data.xlsx')
+    send_email(report_file_path)
+
+if __name__ == "__main__":
+    main()
+    
